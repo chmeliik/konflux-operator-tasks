@@ -7,6 +7,8 @@ rules:
   colons: enable
   commas: enable
   comments:
+    # Allow 1 space before comments to accommodate Renovate's GitHub Action version comments
+    min-spaces-from-content: 1
     level: warning
   comments-indentation:
     level: warning
