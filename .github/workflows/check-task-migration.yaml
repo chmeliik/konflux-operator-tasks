@@ -47,6 +47,7 @@ jobs:
           git checkout -b pr-verify
           export IN_CLUSTER=1
           bash ./hack/validate-migration.sh
+<<<<<<< ours
 
       - name: Check MIGRATION.md
         run: |
@@ -62,3 +63,5 @@ jobs:
             done
           done
           exit $EXIT
+=======
+>>>>>>> theirs
