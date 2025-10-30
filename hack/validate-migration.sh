@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 
+# <TEMPLATED FILE!>
+# This file comes from the templates at https://github.com/konflux-ci/task-repo-shared-ci.
+# Please consider sending a PR upstream instead of editing the file directly.
+# See the SHARED-CI.md document in this repo for more details.
+
 # Validate migration file introduced by a branch.
 #
 # This script can be run in the CI against a PR or in local from a topic branch.
@@ -94,41 +99,6 @@ prepare_pipelines() {
         info "fetch pipeline $pl_name from bundle $pl_bundle -> $pl_file"
         tkn bundle list "$pl_bundle" pipeline "$pl_name" -o yaml >"$pl_file"
     done <<<"$pushed_pipelines"
-
-    mkdir -p "${WORK_DIR}/pipelines/local"
-    kubectl kustomize --output "${WORK_DIR}/pipelines/local" pipelines/
-
-    local -r names="${pl_names_in_config[*]}"
-    read -r hexdigits _ < <(sha256sum "${BASH_SOURCE[0]}")
-    local -r fake_digest="sha256:${hexdigits}"
-    local fake_bundle_ref=
-    local task_name=
-    local task_selector=
-
-    find "${WORK_DIR}/pipelines/local" -type f -name "*.yaml" | \
-        while read -r file_path; do
-            if [[ ! "$names" =~ $(yq '.metadata.name' "$file_path") ]]; then
-                # Drop pipelines that are not included in the config above.
-                rm "$file_path"
-            else
-                # Replace taskRef with fake bundle reference so that the
-                # .taskRef.version field will not confuse tekton.
-                #
-                for task_name in $(yq '(.spec.tasks[], .spec.finally[]) | .name' "$file_path"); do
-                    fake_bundle_ref="{
-                        \"resolver\": \"bundles\",
-                        \"params\": [
-                            {\"name\": \"name\", \"value\": \"${task_name}\"},
-                            {\"name\": \"bundle\", \"value\": \"${fake_digest}\"},
-                            {\"name\": \"kind\", \"value\": \"task\"}
-                        ]
-                    }"
-                    task_selector="(.spec.tasks[], .spec.finally[]) | select(.name == \"${task_name}\")"
-                    yq -i "(${task_selector} | .taskRef) |= ${fake_bundle_ref}" "$file_path"
-                done
-                format_yaml_in_python "$file_path"
-            fi
-        done
 
     return 0
 }

@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# <TEMPLATED FILE!>
+# This file comes from the templates at https://github.com/konflux-ci/task-repo-shared-ci.
+# Please consider sending a PR upstream instead of editing the file directly.
+# See the SHARED-CI.md document in this repo for more details.
+
 set -e
 # This script will run task tests for all task directories
 # provided either via TEST_ITEMS env var, or as arguments
@@ -103,21 +108,25 @@ for ITEM in $TEST_ITEMS; do
   TASK_COPY=$(mktemp /tmp/task.XXXXXX)
   clean() { rm -f ${TASK_COPY}; }
   trap clean EXIT
-  
+
   cp "$TASK_PATH" "$TASK_COPY"
+
+  # Create test namespace
+  if ! ${KUBECTL_CMD} get namespace ${TEST_NS}; then
+    ${KUBECTL_CMD} create namespace ${TEST_NS}
+  fi
 
   # run the pre-apply-task-hook.sh if exists
   if [ -f ${TESTS_DIR}/pre-apply-task-hook.sh ]
   then
     echo "Found pre-apply-task-hook.sh file in dir: $TESTS_DIR. Executing..."
-    ${TESTS_DIR}/pre-apply-task-hook.sh "$TASK_COPY"
+    ${TESTS_DIR}/pre-apply-task-hook.sh "$TASK_COPY" "$TEST_NS"
   fi
 
-  # Create test namespace
-  ${KUBECTL_CMD} create namespace ${TEST_NS}
-
-  # Create the service account appstudio-pipeline (konflux spedific requirement)
-  $KUBECTL_CMD create sa appstudio-pipeline -n ${TEST_NS}
+  # Create the service account appstudio-pipeline (konflux specific requirement)
+  if ! ${KUBECTL_CMD} get sa appstudio-pipeline -n ${TEST_NS}; then
+    ${KUBECTL_CMD} create sa appstudio-pipeline -n ${TEST_NS}
+  fi
 
   # dry-run this YAML to validate and also get formatting side-effects.
   ${KUBECTL_CMD} -n ${TEST_NS} create -f ${TASK_COPY} --dry-run=client -o yaml
