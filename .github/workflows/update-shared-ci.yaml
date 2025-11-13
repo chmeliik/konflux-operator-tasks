@@ -6,7 +6,7 @@
 # Inspired by https://cruft.github.io/cruft/#automating-updates-with-github-actions
 name: Update shared CI files
 'on':
-  workflow_dispatch: {}  # Allow to run manually
+  workflow_dispatch:  # Allow to run manually
   schedule:
     - cron: "0 2 * * 0"  # Every Sunday at 02:00
 jobs:
