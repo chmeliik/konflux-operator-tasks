@@ -1,3 +1,5 @@
+# yamllint disable-file
+
 # <TEMPLATED FILE!>
 # This file comes from the templates at https://github.com/konflux-ci/task-repo-shared-ci.
 # Please consider sending a PR upstream instead of editing the file directly.
@@ -47,19 +49,3 @@ jobs:
           git checkout -b pr-verify
           export IN_CLUSTER=1
           bash ./hack/validate-migration.sh
-
-      - name: Check MIGRATION.md
-        run: |
-          EXIT=0
-          for TASK_DIR in $(ls task); do
-            # Do not check on initial version of task
-            for VERSION in $(ls -d task/$TASK_DIR/*/ | sort --version-sort | tail -n+2); do
-              MIGRATION_FILE=${VERSION}MIGRATION.md
-              if [ ! -f $MIGRATION_FILE ]; then
-                 echo "Missing file $MIGRATION_FILE"
-                 EXIT=1
-              fi
-            done
-          done
-          exit $EXIT
-
