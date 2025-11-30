@@ -11,6 +11,7 @@
     ".github/workflows/checkton.yaml",
     ".github/workflows/run-task-tests.yaml",
     ".github/workflows/task-lint.yaml",
-    ".github/workflows/update-shared-ci.yaml"
+    ".github/workflows/update-shared-ci.yaml",
+    ".github/workflows/versioning.yaml"
   ]
 }
