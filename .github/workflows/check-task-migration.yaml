@@ -1,3 +1,5 @@
+# yamllint disable-file
+
 # <TEMPLATED FILE!>
 # This file comes from the templates at https://github.com/konflux-ci/task-repo-shared-ci.
 # Please consider sending a PR upstream instead of editing the file directly.
@@ -14,11 +16,11 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           fetch-depth: 0
       - name: Create k8s Kind Cluster
-        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
+        uses: helm/kind-action@92086f6be054225fa813e0a4b13787fc9088faab # v1.13.0
         with:
           cluster_name: kind
       - uses: tektoncd/actions/setup-tektoncd@main
@@ -47,19 +49,3 @@ jobs:
           git checkout -b pr-verify
           export IN_CLUSTER=1
           bash ./hack/validate-migration.sh
-
-      - name: Check MIGRATION.md
-        run: |
-          EXIT=0
-          for TASK_DIR in $(ls task); do
-            # Do not check on initial version of task
-            for VERSION in $(ls -d task/$TASK_DIR/*/ | sort --version-sort | tail -n+2); do
-              MIGRATION_FILE=${VERSION}MIGRATION.md
-              if [ ! -f $MIGRATION_FILE ]; then
-                 echo "Missing file $MIGRATION_FILE"
-                 EXIT=1
-              fi
-            done
-          done
-          exit $EXIT
-
