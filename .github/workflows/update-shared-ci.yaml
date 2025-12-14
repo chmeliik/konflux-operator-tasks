@@ -1,3 +1,5 @@
+# yamllint disable-file
+
 # <TEMPLATED FILE!>
 # This file comes from the templates at https://github.com/konflux-ci/task-repo-shared-ci.
 # Please consider sending a PR upstream instead of editing the file directly.
@@ -13,7 +15,7 @@ jobs:
   update:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           # cruft works better with full git history
           fetch-depth: 0
@@ -104,7 +106,7 @@ jobs:
 
           bash "$renovate_update_script"
 
-      - uses: actions/create-github-app-token@67018539274d69449ef7c02e8e71183d1719ab42 # v2.1.4
+      - uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf # v2.2.1
         id: app-token
         with:
           # These may already be set globally for your organization
@@ -113,7 +115,7 @@ jobs:
           private-key: ${{ secrets.SHARED_CI_UPDATER_PRIVATE_KEY }}
 
       - name: Create pull request if needed
-        uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e # v7.0.8
+        uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7.0.11
         with:
           token: ${{ steps.app-token.outputs.token }}
           title: Update shared CI files

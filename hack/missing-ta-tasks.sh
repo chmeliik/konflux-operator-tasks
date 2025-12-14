@@ -65,6 +65,12 @@ emit() {
       # we are looking at a Task
       yq -e '.kind != "Task"' "${task_file}" > /dev/null 2>&1 && continue
 
+      is_deprecated=$(yq '.metadata?.annotations?["build.appstudio.redhat.com/expires-on"] != null' "${task_file}")
+      if [[ "${is_deprecated}" == true ]]; then
+          echo "skipping ${task} (is deprecated)"
+          continue
+      fi
+
       # path elements of the task file path
       readarray -d / paths <<< "${task}"
       # PVC non-optional workspaces used
