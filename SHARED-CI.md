@@ -41,37 +41,69 @@ as you make more local changes you increase the chance of merge conflicts.
 
 ## 🌲 Expected repository structure
 
-The shared scripts and workflows expect this repository to follow the
-[Tekton Catalog structure][tekton-catalog-structure].
+The shared scripts and workflows expect tasks to be organized under the `task/` directory.
+The task YAML file must be named `${task_name}.yaml` and placed under `task/${task_name}/`.
 
 They also introduce new elements and conventions, such as the `${task_name}-oci-ta`
 directories for [Trusted Artifacts](#trusted-artifacts) tasks.
 
 For details on how the `tests` directory is used, see [Task Integration Tests](#task-integration-tests).
 
-Putting it all together, the structure is as follows:
+### Flexible directory structure
+
+Task files can be placed at any nesting level within the task directory:
+
+```text
+task/${task_name}/${task_name}.yaml                   👈 flat (recommended)
+task/${task_name}/**/${task_name}.yaml                👈 arbitrarily nested
+task/${task_name}/${version}/${task_name}.yaml        👈 legacy (version subdir)
+```
+
+> [!NOTE]
+> The task version is determined by the `app.kubernetes.io/version` label in the task YAML,
+> not by the directory structure.
+
+### Example structure
 
 ```text
 task                                    👈 all tasks go here
-├── hello                               👈 the name of a task
-│   ├── 0.1                             👈 a specific version of the task
-│   │   ├── hello.yaml                  👈 ${task_name}.yaml
-│   │   └── README.md
-│   │   └── tests                       👈 Test directory
-│   │       ├── test-hello.yaml         👈 Test - A Pipeline named test-*.yaml
-│   │       ├── test-hello-2.yaml       👈 Test case 2
-│   │       └── pre-apply-task-hook.sh  👈 Optional hook
-│   └── 0.2
-│       ├── hello.yaml
-│       ├── MIGRATION.md                👈 migration notes for this version
-│       ├── migrations
-│       │   └── 0.2.sh                  👈 script for migrating to 0.2
+├── goodbye                             👈 flat structure (recommended)
+│   ├── CHANGELOG.md                    👈 the changelog for this task (required)
+│   ├── goodbye.yaml                    👈 task YAML directly in task dir
+│   ├── kustomization.yaml
+│   ├── migrations
+│   │   └── 0.2.sh                      👈 script for migrating to 0.2
+│   └── tests                           👈 Test directory
+│       ├── test-goodbye.yaml           👈 Test - A Pipeline named test-*.yaml
+│       └── pre-apply-task-hook.sh      👈 Optional hook
+├── goodbye-oci-ta                      👈 ${task_name}-oci-ta for Trusted Artifacts
+│   ├── CHANGELOG.md
+│   ├── goodbye-oci-ta.yaml
+│   └── recipe.yaml                     👈 triggers auto-generation of the task yaml
+├── greet                               👈 nested structure
+│   ├── CHANGELOG.md
+│   └── subdir
+│       └── deep
+│           ├── greet.yaml              👈 task YAML in nested subdir
+│           └── tests
+│               └── test-greet.yaml
+├── greet-oci-ta                        👈 TA variant mirrors base task structure
+│   ├── CHANGELOG.md
+│   └── subdir
+│       └── deep
+│           ├── greet-oci-ta.yaml
+│           └── recipe.yaml
+├── hello                               👈 legacy structure with version subdirs
+│   ├── CHANGELOG.md
+│   └── 0.1                             👈 a specific version of the task
+│       ├── hello.yaml                  👈 ${task_name}.yaml
 │       └── README.md
-└── hello-oci-ta                        👈 ${task_name}-oci-ta for Trusted Artifacts
+└── hello-oci-ta                        👈 TA variant for legacy structure
+    ├── CHANGELOG.md
     └── 0.1
         ├── hello-oci-ta.yaml
         ├── README.md
-        └── recipe.yaml                 👈 triggers auto-generation of the task yaml
+        └── recipe.yaml
 ```
 
 ## ☑️ CI workflows
@@ -83,7 +115,7 @@ task                                    👈 all tasks go here
 - workflow: [`.github/workflows/checkton.yaml`](.github/workflows/checkton.yaml)
   - Runs ShellCheck on scripts embedded in YAML files.
 
-Checkton is used to lint shell scripts embedded in YAML files (primarily Tekton files). 
+Checkton is used to lint shell scripts embedded in YAML files (primarily Tekton files).
 It does so by running ShellCheck. For more details, see the [checkton project](https://github.com/chmeliik/checkton)
 
 ### Task migration
@@ -93,45 +125,71 @@ It does so by running ShellCheck. For more details, see the [checkton project](h
 - script: [`hack/validate-migration.sh`](hack/validate-migration.sh)
   - Validates migration scripts.
 - workflow: [`.github/workflows/check-task-migration.yaml`](.github/workflows/check-task-migration.yaml)
-  - Validates migration scripts and ensures MIGRATION.md is provided.
+  - Validates migration scripts.
 
 Task migrations allow task maintainers to introduce changes to Konflux standard
 pipelines according to the task updates. By creating migrations, task
 maintainers are able to add/remove/update task parameters, change task
 execution order, add/remove mandatory task to/from pipelines, etc.
 
-Historically, task maintainers write `MIGRATION.md` to notify users what changes
-have to be made to the pipeline. This mechanism is not deprecated. Besides
-writing the document, it is also recommended to write a migration script so that the
-updates can be applied to user pipelines automatically, that is done by the
+Task maintainers record task changes in `CHANGELOG.md`. If there is any
+pipeline changes accordingly, it is also recommended to create a task migration
+in order to be applied to user pipelines automatically, that is done by the
 [pipeline-migration-tool](https://github.com/konflux-ci/pipeline-migration-tool).
 
-Task migrations are Bash scripts defined in version-specific task
-directories. In general, a migration consists of a series of `yq` commands that
-modify pipeline in order to work with the new version of task. Developers can
-do more with task migrations on the pipelines, e.g. add/remove a task,
-add/remove/update task parameters, change execution order of a task, etc.
+Task migrations are Bash scripts defined in task directories. In general, a
+migration consists of a series of pipeline-migration-tool `modify` subcommands
+to modify pipeline YAML in order to work with the new version of
+task. Developers can do more with task migrations on the pipelines,
+e.g. add/remove a task, add/remove/update task parameters, change execution
+order of a task, etc.
+
+### `pmt-modify` command
+
+`modify` is a subcommand of pipeline-migration-tool, which does in-place
+modification on both Pipeline and PipelineRun definitions.
+
+`pmt` is an alias for the pipeline-migration-tool executable command. In
+migration scripts, invoke the command like this:
+
+```bash
+pmt modify -f "$pipeline_file" ...
+```
+
+> [!IMPORTANT]
+> Using `yq -i` to modify pipelines has been deprecated. Task maintainers must
+> invoke `pmt modify` in new migrations.
+
+For more information about the command, please refer to [To modify Konflux
+pipelines with modify] and `pmt modify --help`.
 
 #### Create a migration
 
 The following is the steps to write a migration:
 
 - Bump task version. Modify label `app.kubernetes.io/version` in the task YAML file.
-- Ensure `migrations/` directory exists in the version-specific task directory.
+- Ensure `migrations/` directory exists in the task directory alongside the
+  task YAML file.
 - Create a migration file under the `migrations/` directory. Its name is in
   form `<new task version>.sh`. Note that the version must match the bumped
   version.
 
+For example, to create a migration for task `goodbye`, migration file should be
+present like this:
+
+```
+task
+└── goodbye
+    ├── goodbye.yaml
+    └── migrations
+        └── 0.2.sh
+```
+
 The migration file is a normal Bash script file:
 
-- It accepts a single argument. The pipeline file path is provided via this
-  argument. The script must work with a Tekton Pipeline by modifying the
-  pipeline definition under the `.spec` field. In practice, regardless of whether
-  the pipeline definition is embedded within the PipelineRun by `pipelineSpec` or
-  extracted into a separate YAML file, the migration tool ensures that the
-  passed-in pipeline file contains the correct pipeline definition.
-- All modifications to the pipeline must be done in-place, i.e. using `yq
-  -i` to operate the pipeline YAML.
+- It accepts a single argument, which is a file path pointing to a
+  Pipeline/PipelineRun file including the task bundle update.
+- Use `pmt-modify` command to modify pipeline YAML.
 - It should be simple and small as much as possible.
 - It should be idempotent as much as possible to ensure that the changes are
   not duplicated to the pipeline when run the migration multiple times.
@@ -154,20 +212,23 @@ cat >task/task-a/0.2/migrations/0.2.2.sh <<EOF
 set -e
 pipeline_file=\$1
 
-# Ensure parameter is added only once whatever how many times to run this script.
-if ! yq -e '.spec.tasks[] | select(.name == "task-a") | .params[] | select(.name == "pipelinerun-name")' >/dev/null
-then
-  yq -i -e '
-    (.spec.tasks[] | select(.name == "task-a") | .params) +=
-    {"name": "pipelinerun-name", "value": "\$(context.pipelineRun.name)"}
-  ' "\$pipeline_file"
-fi
+# add-param subcommand is idempotent. It does not add parameter repeatedly.
+pmt modify -f "\$pipeline_file" task task-a add-param pipelinerun-name "\$(context.pipelineRun.name)"
 EOF
 ```
 
+> [!TIP]
+> Task selector `(.spec.tasks[], .spec.pipelineSpec.tasks[])` in the above
+> example makes it easy to test the migration scripts in local by passing
+> Pipeline or PipelineRun YAML file. For example:
+> ```bash
+> bash task/hello/migrations/0.2.sh /path/to/repo/.tekton/component-a-pull.yaml`
+> ```
+> Note: ensure `pmt` is available in `$PATH`.
+
 To add a new task to the user pipelines, a migration can be created with a
 fictional task update. That is to select a task, bump its version
-and create a migration under its version-specific directory.
+and create a migration under the task directory.
 
 #### Create a startup migration by the helper script
 
@@ -205,28 +266,15 @@ is the workflow:
     ./hack/create-task-migration.sh -t <task name>
     ```
 
-  - Edit the generated migration file, write script to add the task. Here is an
-    example using `yq`:
+  - Edit the generated migration file, write script to add the task:
 
     ```bash
     #!/usr/bin/env bash
     pipeline=$1
     name="<task name>"
-    if ! yq -e ".spec.tasks[] | select(.name == \"${name}\")" "$pipeline" >/dev/null 2>&1
-    then
-      task_def="{
-        \"name\": \"${name}\",
-        \"taskRef\": {
-          \"params\": [
-            {\"name\": \"name\", \"value\": \"${name}\"},
-            {\"name\": \"bundle\", \"value\": \"<bundle reference>\"},
-            {\"name\": \"kind\", \"value\": \"task\"}
-          ]
-        },
-        \"runAfter\": [\"<task name>\"]
-      }"
-      yq -i ".spec.tasks += ${task_def}" "$pipeline"
-    fi
+    bundle_ref="<image reference>"
+    # add-task subcommand is idempotent. It does not add a task repeatedly.
+    pmt add-task --run-after "<task name>" --bundle-ref "$bundle_ref" "$name" "$pipeline"
     ```
 
     Add necessary additional code to make the migration work well.
@@ -235,7 +283,6 @@ is the workflow:
   review process.
 
 The migration will be applied during next Renovate run scheduled by MintMaker.
-
 
 ### Kustomize Build
 
@@ -246,7 +293,7 @@ The migration will be applied during next Renovate run scheduled by MintMaker.
 
 With Kustomize, Task manifests are generated and kept consistent across the
 repository by composing base definitions (kustomize.yaml) with patches (patch.yaml).
-This ensures that all Task YAML manifests are reproducible and remain in sync 
+This ensures that all Task YAML manifests are reproducible and remain in sync
 with their source definitions.
 
 When authoring or modifying a Task, contributors should update the corresponding
@@ -266,7 +313,7 @@ Use [`hack/build-manifests.sh`](hack/build-manifests.sh) to regenerate the manif
 With Trusted Artifacts (TA), Tasks share files via the use of archives stored in
 an image repository and not using attached storage (PersistentVolumeClaims). This
 has performance and usability benefits. For more details, see
-[ADR36](https://konflux-ci.dev/architecture/ADR/0036-trusted-artifacts.html).
+[ADR36](https://konflux-ci.dev/architecture/ADR/0036-trusted-artifacts).
 
 When authoring a Task that needs to share or use files from another Task, the
 task author can opt to include the Trusted Artifact variant, by convention in
@@ -323,6 +370,8 @@ You can also trigger it manually from the Actions tab of your repo.
 - Install your organization's updater GitHub app in your repository. If the app
   doesn't exist yet, an administrator can follow the [instructions](#set-up-the-github-app)
   to create it.
+  - If your repository is in <https://github.com/konflux-ci>, use the [konflux-ci-shared-ci-updater]
+    app. The [build-maintainers] team can provide the values for the secrets below.
 - In the repository settings (`Secrets and variables` > `Actions`), add the required
   secrets. Ask an administrator to provide their values:
   - `SHARED_CI_UPDATER_APP_ID` - the ID of the updater GitHub app
@@ -399,15 +448,15 @@ This workflow is designed to be efficient by following a two-stage logic:
 
 #### How to Add a Test
 
-1. Create a `tests` directory inside the task's versioned folder.  
+1. Create a `tests` directory alongside the task YAML file.
 
-2. Inside the `tests` directory, create a test file named `test-*.yaml` (for example, `test-hello.yaml`).  
-   - The script **automatically** discovers tests based on this naming convention.  
+2. Inside the `tests` directory, create a test file named `test-*.yaml` (for example, `test-hello.yaml`).
+   - The script **automatically** discovers tests based on this naming convention.
 
-3. The file must define a Tekton `kind: Pipeline` object.  
+3. The file must define a Tekton `kind: Pipeline` object.
 
-4. The Pipeline must declare a workspace named exactly `tests-workspace`.  
-   - The test script will **automatically** provide storage for this workspace when it runs the pipeline.  
+4. The Pipeline must declare a workspace named exactly `tests-workspace`.
+   - The test script will **automatically** provide storage for this workspace when it runs the pipeline.
 
 5. Optionally, add a `pre-apply-task-hook.sh` to the `tests` directory.
 
@@ -415,13 +464,12 @@ This workflow is designed to be efficient by following a two-stage logic:
 
 ```plaintext
 task
-└── hello
-    └── 0.1
-        ├── hello.yaml
-        └── tests                         👈 Test directory
-            └── test-hello.yaml           👈 Test - A Pipeline named test-*.yaml
-            └── test-hello-2.yaml         👈 Test case 2
-            └── pre-apply-task-hook.sh    👈 Optional hook
+└── goodbye
+    ├── goodbye.yaml
+    └── tests                             👈 Test directory
+        ├── test-goodbye.yaml             👈 Test - A Pipeline named test-*.yaml
+        ├── test-goodbye-2.yaml           👈 Test case 2
+        └── pre-apply-task-hook.sh        👈 Optional hook
 ```
 
 #### Using a `pre-apply-task-hook.sh`
@@ -430,14 +478,13 @@ In some cases, your Task may require certain Kubernetes resources, like **Secret
 
 To handle this, you can create an optional shell script named `pre-apply-task-hook.sh` and place it inside the `tests` directory.
 
-If this script exists, the test runner will execute it **after creating the test namespace but before applying the task**. 
+If this script exists, the test runner will execute it **after creating the test namespace but before applying the task**.
 This allows the hook to dynamically modify the task's definition before it is applied. For example, to lower/remove resource requests and limits for a constrained test environment.
 
 The script receives two arguments:
 
 - `$1`: The path to a temporary copy of the task's YAML file.  
 - `$2`: The name of the temporary test namespace where the test will run.  
-
 
 <details>
 <summary><b>Click to see an example <code>pre-apply-task-hook.sh</code></b></summary>
@@ -466,6 +513,7 @@ echo '{"auths":{}}' | kubectl create secret generic dummy-secret \
 echo "Pre-requirements setup complete for namespace: $TEST_NS"
 
 ```
+
 </details>  
 
 ### Tekton Security Task Lint
@@ -480,6 +528,69 @@ Using `$(params.*)` directly in a script creates a security flaw. Tekton perform
 
 For more details and guidance on fixing the issue, see the [Tekton recommendations](https://github.com/tektoncd/catalog/blob/main/recommendations.md#dont-use-interpolation-in-scripts-or-string-arguments)
 
+### Versioning
+
+- script: [`hack/versioning.py`](hack/versioning.py)
+  - The `check` subcommand checks versioning requirements for new and modified Tasks
+  - The `new-changelog` subcommand creates basic `CHANGELOG.md`s for the specified Tasks
+- workflow: [`.github/workflows/versioning.yaml`](.github/workflows/versioning.yaml)
+  - Runs the `check` subcommand for PRs
+
+#### Versioning requirements
+
+1. Tasks must have the `app.kubernetes.io/version` label
+
+    ```yaml
+    metadata:
+      labels:
+        app.kubernetes.io/version: "0.1.0"
+    ```
+
+    1. The version label must be in the form `x.y` or `x.y.z`, where `x y z` are integers
+
+2. Tasks must have a CHANGELOG.md at `task/${task_name}/CHANGELOG.md`.
+   For details about the format, see [ADR 54: CHANGELOG.md format].
+3. When modifying existing Tasks:
+    1. If you want the change to get released, update the version label.
+       Otherwise, CI may skip building the Task.
+    2. If the change is relevant to users, update the CHANGELOG.md.
+       If you're not updating the version label, update the `Unreleased` section.
+
+Check versioning requirements for the files that got modified/added between the
+base revision (defaults to `main`) and your current HEAD:
+
+```bash
+hack/versioning.py check
+```
+
+> [!NOTE]
+> When processing existing Tasks, the script treats most violations as warnings,
+> not errors. Some of the requirements are new, so the check aims to inform about
+> them but not to block PRs from getting merged.
+>
+> Requirements 3.1. and 3.2. are always only warnings. The goal is to remind the
+> contributor how versioning is done but leave the freedom to make changes without
+> releasing them right away.
+
+#### Adding `CHANGELOG.md`s
+
+Add CHANGELOG.md for a single Task:
+
+```bash
+hack/versioning.py new-changelog task/hello/
+```
+
+Add CHANGELOG.md for all Tasks that don't have one:
+
+```bash
+hack/versioning.py new-changelog task/
+```
+
+> [!NOTE]
+> The script makes no attempt to retroactively document the changes in each Task version.
+> The script simply marks the current version as the one that started tracking changes
+> in CHANGELOG.md. If the highest found version is `<=0.1.0`, it instead marks this
+> as the initial version of the Task.
 
 [task-repo-shared-ci]: https://github.com/konflux-ci/task-repo-shared-ci
 [onboarding process]: https://github.com/konflux-ci/task-repo-shared-ci?tab=readme-ov-file#-onboarding
@@ -491,3 +602,7 @@ For more details and guidance on fixing the issue, see the [Tekton recommendatio
 [tekton-catalog-structure]: https://github.com/tektoncd/catalog?tab=readme-ov-file#catalog-structure
 [Renovate]: https://docs.renovatebot.com/
 [renovate-ignorepaths]: https://docs.renovatebot.com/configuration-options/#ignorepaths
+[ADR 54: CHANGELOG.md format]: https://github.com/konflux-ci/architecture/blob/main/ADR/0054-task-versioning.md#changelogmd-format
+[To modify Konflux pipelines with modify]: https://github.com/konflux-ci/pipeline-migration-tool?tab=readme-ov-file#to-modify-konflux-pipelines-with-modify
+[konflux-ci-shared-ci-updater]: https://github.com/apps/konflux-ci-shared-ci-updater
+[build-maintainers]: https://github.com/orgs/konflux-ci/teams/build-maintainers
