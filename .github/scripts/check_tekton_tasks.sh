@@ -15,7 +15,7 @@ fi
 echo ">>> Applying and validating Tekton Tasks"
 
 for TASK_DIR in "$@"; do
-    TASK_NAME=$(basename "$(dirname "$TASK_DIR")")
+    TASK_NAME=$(echo "$TASK_DIR" | cut -d '/' -f 2)
     TASK_YAML_PATH="${TASK_DIR}/${TASK_NAME}.yaml"
 
     if [ -f "$TASK_YAML_PATH" ]; then
